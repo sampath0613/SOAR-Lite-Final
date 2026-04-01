@@ -173,17 +173,5 @@ This project demonstrates understanding of both the **technical architecture** (
 ## 💡 Future Enhancements
 
 - [ ] DAG-based playbook execution (parallel step handling)
-- [ ] WebSocket live dashboard refresh (vs. polling)
 - [ ] Playbook versioning + rollback
 - [ ] Advanced alerting rules (ML-based anomaly detection)
-- [ ] Multi-tenant incident isolation
-
----
-
-## 📝 License
-
-MIT
-
----
-
-**Built by a Security Automation Engineer for S&P Global | April 2026**
