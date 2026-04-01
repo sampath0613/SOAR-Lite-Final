@@ -1,0 +1,20 @@
+name: bruteforce_response
+trigger_alert_type: bruteforce
+min_severity: medium
+steps:
+  - id: check_abuse_db
+    connector: abuseipdb
+    input_field: source_ip
+    timeout: 10
+    retries: 2
+    on_result:
+      - if_expr: "abuse_score > 60"
+        then: escalate
+      - then: continue
+  - id: create_ticket
+    connector: mock_jira
+    input_field: alert_id
+    timeout: 5
+    retries: 1
+    on_result:
+      - then: close

@@ -1,0 +1,29 @@
+name: phishing_triage
+trigger_alert_type: phishing
+min_severity: medium
+steps:
+  - id: enrich_ip
+    connector: virustotal
+    input_field: source_ip
+    timeout: 10
+    retries: 3
+    on_result:
+      - if_expr: "score > 70"
+        then: escalate
+      - then: continue
+  - id: check_reputation
+    connector: abuseipdb
+    input_field: source_ip
+    timeout: 10
+    retries: 2
+    on_result:
+      - if_expr: "abuse_score > 50"
+        then: escalate
+      - then: continue
+  - id: create_ticket
+    connector: mock_jira
+    input_field: alert_id
+    timeout: 5
+    retries: 1
+    on_result:
+      - then: close

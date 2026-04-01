@@ -1,0 +1,165 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
+:root {
+  --bg: #f4f7f8;
+  --panel: #ffffff;
+  --ink: #1f2a37;
+  --muted: #5b7083;
+  --line: #d8e2e8;
+  --ok: #0f766e;
+  --warn: #ea580c;
+  --run: #2563eb;
+  --bad: #dc2626;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at top left, #e9f7f4, var(--bg) 55%);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(120deg, #0f766e, #0b5f58);
+  color: #f8fffe;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.topbar p {
+  margin: 0.15rem 0 0;
+  color: #d2f9f3;
+}
+
+.topbar nav a {
+  color: #e6fffb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.container {
+  padding: 1rem 1.25rem 1.75rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 6px 18px rgba(15, 118, 110, 0.08);
+}
+
+.subtle {
+  color: var(--muted);
+  margin: 0.2rem 0 0.8rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.55rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.badge {
+  border-radius: 999px;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.55rem;
+  color: #fff;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.badge-completed {
+  background: var(--ok);
+}
+
+.badge-escalated {
+  background: var(--warn);
+}
+
+.badge-running {
+  background: var(--run);
+}
+
+.badge-failed {
+  background: var(--bad);
+}
+
+.badge-pending {
+  background: #64748b;
+}
+
+pre {
+  margin: 0;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-good {
+  background: #16a34a;
+  color: #fff;
+}
+
+.btn-bad {
+  background: #dc2626;
+  color: #fff;
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}

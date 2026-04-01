@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>Incident {{ incident.id }}</h2>
+  <div class="grid">
+    <div>
+      <strong>Playbook:</strong> {{ incident.playbook_name }}
+    </div>
+    <div>
+      <strong>Status:</strong>
+      <span class="badge badge-{{ incident.status|lower }}">{{ incident.status }}</span>
+    </div>
+    <div>
+      <strong>Created:</strong> {{ incident.created_at }}
+    </div>
+    <div>
+      <strong>Resolved:</strong> {{ incident.resolved_at or "-" }}
+    </div>
+    <div>
+      <strong>Verdict:</strong> {{ incident.analyst_verdict or "unassigned" }}
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Alert Metadata</h3>
+  <pre>{{ alert | tojson(indent=2) }}</pre>
+</section>
+
+<section class="panel">
+  <h3>Step Timeline</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Step</th>
+        <th>Connector</th>
+        <th>Status</th>
+        <th>Duration (s)</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for step in steps %}
+      <tr>
+        <td>{{ step.step_id }}</td>
+        <td>{{ step.connector }}</td>
+        <td><span class="badge badge-{{ step.status|lower }}">{{ step.status }}</span></td>
+        <td>{{ step.duration_seconds if step.duration_seconds is not none else "-" }}</td>
+        <td><pre>{{ step.result_summary | tojson(indent=2) }}</pre></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <h3>Analyst Verdict</h3>
+  <form method="post" action="/dashboard/incidents/{{ incident.id }}/verdict" class="actions">
+    <button type="submit" name="verdict" value="true_positive" class="btn btn-good">
+      Mark True Positive
+    </button>
+    <button type="submit" name="verdict" value="false_positive" class="btn btn-bad">
+      Mark False Positive
+    </button>
+  </form>
+</section>
+{% endblock %}
