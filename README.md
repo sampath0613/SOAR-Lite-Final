@@ -1,175 +1,58 @@
-# SOAR-Lite: Production-Grade Security Automation Engine
+SOAR-Lite: Security Orchestration, Automation and Response Engine
+A production-grade SOAR engine built from scratch in Python that automates security incident response — ingesting alerts from SIEM platforms, enriching them with third-party threat intelligence, and executing orchestrated playbooks with conditional logic. Built to directly mirror what security analysts do manually in a SOC, and automate it end to end.
 
-## 🎯 Project Overview
+What This Project Does
+A security analyst at a SOC receives hundreds of alerts daily. For each one, they manually check IP reputation, look up file hashes, create Jira tickets, and decide whether to escalate or close. SOAR-Lite eliminates that manual loop. An alert arrives, the engine identifies the right playbook, executes each step automatically — querying APIs, enriching context, routing decisions — and presents the analyst with a complete incident timeline ready for a single verdict call.
 
-**SOAR-Lite** is a production-ready Security Orchestration, Automation, and Response (SOAR) engine built from scratch in Python. It automates security incident response through a modular, pluggable architecture that ingests alerts from multiple SIEM platforms, correlates threats using third-party threat intelligence APIs, and executes orchestrated playbooks with conditional logic.
+Architecture
+ComponentWhat It DoesAlert IngestionFastAPI webhook accepting Splunk and generic JSON alert formats; normalizes to a unified schemaPlaybook EngineReads YAML-defined workflows; executes steps sequentially with conditional routing and exponential backoff retryConnector FrameworkAbstract base class with registry pattern; current integrations: VirusTotal, AbuseIPDB, Shodan, Mock Jira, SlackIncident StoreSQLAlchemy 2.0 async ORM on SQLite; tracks every alert, step execution, and connector response with full audit trailAnalytics EngineComputes per-step utility scores post-analyst feedback; surfaces which playbook steps drive true positive verdicts and which are noiseDashboardReal-time incident queue with per-incident execution timelines and playbook health metrics via Jinja2 and AJAX polling
 
----
+Playbook Development
+Three reference playbooks ship with the engine, each demonstrating if-then-that automation logic:
 
-## 🏗️ Architecture & Design
+phishing_triage.yaml — URL detonation, IP reputation check, conditional block or escalate
+malware_detection.yaml — file hash lookup via VirusTotal, ticket creation in Jira, escalation on positive match
+bruteforce_response.yaml — failed login threshold trigger, IP block, Slack alert
 
-### Core Components
+Playbooks are YAML files that any SOC analyst can read and modify without touching Python. Each step declares its connector, inputs, retry count, timeout, and the condition under which execution proceeds. The engine parses these into Pydantic models and runs them through a state machine: pending → running → completed / failed / escalated.
+Jinja2 templating inside step definitions allows dynamic value injection at runtime — for example, {{ incident.src_ip }} is resolved from the live incident record before the connector call is made.
 
-| Component | Purpose | Implementation |
-|-----------|---------|-----------------|
-| **Alert Ingestion** | Webhook endpoint accepting alerts from Splunk, QRadar, generic JSON | FastAPI POST `/alerts` with schema normalization |
-| **Connector Framework** | Unified interface for third-party API integration | BaseConnector abstract class with Registry pattern for dynamic resolution |
-| **Playbook Engine** | YAML-defined orchestration logic with conditional routing | State machine executor with exponential backoff retry (2, 4, 8s) |
-| **Incident Tracking** | Persistent storage of alerts, executions, and analyst verdicts | SQLAlchemy 2.0 async ORM with SQLite backend |
-| **Analytics** | Step-level utility scoring to identify high-value automations | True positive ratio per step; identifies low-ROI playbook steps |
-| **Dashboard** | Real-time incident queue visualization | Jinja2 + AJAX polling (10s refresh) for incident list and details |
+API Integration
+All external tool connections are built through a unified BaseConnector interface with a registry pattern — the engine resolves connectors by name at runtime without any hardcoded dispatch logic. Adding a new integration means writing one class; nothing else changes.
+Current connectors and what they do:
 
-### Architecture Pattern: Registry Pattern
-Dynamic connector resolution eliminates hardcoded if/elif chains:
-```python
-CONNECTOR_REGISTRY = {
-    "virustotal": VirusTotal,
-    "abuseipdb": AbuseIPDB,
-    "jira": MockJira
-}
-connector = CONNECTOR_REGISTRY[name]()  # Runtime instantiation
-```
+VirusTotal: file and URL hash lookups with confidence scoring
+AbuseIPDB: IP reputation checks returning abuse reports and risk scores
+Shodan: host enrichment for open ports and service fingerprints
+Mock Jira: ticket creation simulator for testing escalation workflows
+Slack: alert notification for escalated incidents
 
----
+All connector calls are fully async using httpx, with exponential backoff retry (2, 4, 8 seconds with jitter) to handle API outages without cascading failures.
 
-## 🔧 What I Built
+Alert Enrichment
+When an alert arrives at POST /alerts, the engine automatically:
 
-### 1. **Async API Framework** (FastAPI)
-- Webhook intake endpoint: `POST /alerts` (accepts Splunk, QRadar, generic JSON formats)
-- Incident management: `GET /incidents`, `PATCH /incidents/{id}/verdict`
-- Connector health checks: `/api/health`
-- Analytics dashboard feed: `/api/analytics/summary`
-- Playbook listing: `/api/playbooks` with step utility scores
+Normalizes the alert format to a standard internal schema
+Matches it to compatible playbooks based on alert type and severity
+Executes each enrichment step — querying VirusTotal, AbuseIPDB, or Shodan as defined in the playbook
+Persists every connector response to the incident record
+Surfaces the complete enriched context to the analyst on the dashboard
 
-### 2. **Connector Layer** (3 Implementations)
-- **VirusTotal**: File/URL hash lookups with confidence scoring
-- **AbuseIPDB**: IP reputation checks with abuse reports
-- **Mock JIRA**: Ticket creation simulator for testing
+The analyst receives a pre-enriched incident rather than a raw alert — the manual lookup work is already done.
 
-All connectors implement `BaseConnector` interface with unified `execute()` and `health_check()` methods, enabling easy addition of new integrations.
+Workflow Testing
 
-### 3. **Playbook-Based Orchestration** (YAML)
-3 reference playbooks demonstrating if-then-that automation:
-- `phishing_triage.yaml`: Email URL detonation + IP blocking
-- `malware_detection.yaml`: Hash lookup + ticket creation + escalation  
-- `bruteforce_response.yaml`: Failed login threshold → IP blocking + alerting
+102 tests passing, 82% coverage
+Unit tests cover connector mocks, YAML parser validation, and state machine transitions
+Integration tests run end-to-end alert ingestion through verdict assignment
+Load tests verify concurrent handling of 50 alerts per batch
+All connector calls use sandboxed expression evaluation via simpleeval — raw Python eval is never used
 
-Playbooks define:
-- `trigger_alert_type`: What SIEM alerts activate this (e.g., "phishing")
-- `min_severity`: Minimum threat severity to execute (critical/high/medium/low)
-- `steps[]`: Sequential tasks with conditions, retries, timeouts
 
-**Execution Flow**: 
-1. Alert arrives → normalizer extracts type+severity
-2. Matcher finds compatible playbooks
-3. Executor runs steps sequentially with retry logic
-4. Each step creates `StepExecution` record (status, output, connector used)
-5. Analyst manually sets incident verdict (true_positive/false_positive)
+Step-Utility Analytics
+After analysts mark incidents as true or false positives, the analytics engine computes a utility score per playbook step:
+Utility Score = Steps flagged true positive / Total steps with analyst verdict
+This surfaces which automation steps are genuinely influencing analyst decisions and which are generating noise. It answers the operational question that most SOAR deployments ignore: not "did the step run successfully" but "did the step's output actually matter."
 
-### 4. **Database Layer** (SQLAlchemy 2.0 Async)
-Three core tables with relationship tracking:
-- `incidents`: Alert metadata + status (pending/running/completed/failed)
-- `step_executions`: Per-step outputs, execution time, connector response
-- `playbook_metrics`: Aggregated analytics (success rate, avg duration)
-
-100% async with **aiosqlite** for non-blocking SQLite I/O.
-
-### 5. **Analytics Engine**
-Computes per-step utility scores to surface high-ROI automations:
-```
-Utility Score = (Steps with True Positive Verdicts) / (Total Steps with Verdict)
-```
-Helps security teams identify which playbook steps are worth maintaining vs. tuning/removing.
-
-### 6. **Full-Stack Dashboard**
-- **Backend**: Jinja2 template rendering incident queue
-- **Frontend**: HTML/CSS/JavaScript with AJAX polling
-- **Features**: Incident status cards, chronological step execution timeline, analyst verdict buttons
-
----
-
-## 🛠️ How I Built It
-
-### Technology Stack
-- **Framework**: FastAPI 0.111+ (async REST with automatic OpenAPI docs)
-- **ORM**: SQLAlchemy 2.0+ (async Mapped[] syntax) + aiosqlite
-- **Validation**: Pydantic 2.7+ (model validation, field validators)
-- **Orchestration**: YAML playbooks parsed into Pydantic models (safe eval with simpleeval, not Python eval)
-- **HTTP Client**: httpx (async connector calls)
-- **Frontend**: Jinja2 templates + vanilla JavaScript
-- **Testing**: pytest + pytest-asyncio (102 tests, 82% coverage)
-- **Code Quality**: Ruff (all checks passing), mypy type hints
-
-### Key Engineering Decisions
-
-**1. Async/Await Throughout**
-- All database operations non-blocking (aiosqlite)
-- All connector API calls concurrent (httpx)
-- Alert processing spawned as background tasks (asyncio.create_task)
-- Enables handling 50+ concurrent alerts without thread pools
-
-**2. YAML as Single Source of Truth**
-- No orchestration logic hardcoded in Python
-- Playbooks human-readable for SOCs to modify
-- Jinja2 templating in steps for dynamic values (e.g., `{{ incident.src_ip }}`)
-
-**3. Exponential Backoff Retry**
-- Failed connector calls retry: 2, 4, 8 seconds with jitter
-- Prevents cascading failures during API outages
-- Configurable per-step via `retries` field
-
-**4. Registry Pattern for Connectors**
-- Dynamic loading eliminates hardcoded connector dispatch
-- New connectors added without modifying executor code
-- Health checks at startup verify API connectivity
-
----
-
-## 📊 Quality Metrics
-
-| Metric | Value | Target |
-|--------|-------|--------|
-| Test Coverage | 82% | 80% ✅ |
-| Passing Tests | 102 | - |
-| Lint Violations | 0 | 0 ✅ |
-| Lines of Code | ~1,200 | - |
-| Async Operations | 100% | - |
-
-### Test Suite Breakdown
-- **Unit**: Connector mocks, parser validation, state machine logic (50 tests)
-- **Integration**: End-to-end alert ingestion through verdict assignment (30 tests)
-- **Load**: Concurrent alert handling at 50 alerts/batch (15 tests)
-- **E2E**: Full playbook execution with real Pydantic models (7 tests)
-
----
-
-## 🎓 Key Learnings & Technical Skills Demonstrated
-
-✅ **Async Python**: Non-blocking I/O with asyncio, aiosqlite, httpx  
-✅ **API Design**: RESTful endpoints with FastAPI, automatic OpenAPI documentation  
-✅ **Database Design**: Relational schema with SQLAlchemy 2.0 async ORM  
-✅ **Software Architecture**: Registry pattern, dependency injection, separation of concerns  
-✅ **Testing Discipline**: 82% coverage with unit + integration + load tests  
-✅ **Security Practices**: Sandboxed expression evaluation (simpleeval, never raw eval)  
-✅ **DevOps Thinking**: Environment-driven config, health checks, graceful degradation  
-✅ **Documentation**: Clear SOPs and architectural decision records  
-
----
-
-## 🚀 Why This Project Matters
-
-SOAR platforms are **force multipliers in InfoSec**. By automating repetitive alert triage and response workflows, teams can:
-- Reduce incident response time from **hours to minutes**
-- Scale threat detection without hiring more analysts
-- Ensure consistent, documented response procedures
-- Free analysts for complex investigations and threat hunting
-
-This project demonstrates understanding of both the **technical architecture** (async APIs, connectors, databases) and **business value** (automation ROI, incident resolution speed).
-
----
-
-## 💡 Future Enhancements
-
-- [ ] DAG-based playbook execution (parallel step handling)
-- [ ] Playbook versioning + rollback
-- [ ] Advanced alerting rules (ML-based anomaly detection)
+Technology Stack
+Python, FastAPI, SQLAlchemy 2.0 async, aiosqlite, Pydantic 2.7, httpx, YAML, Jinja2, pytest, Ruff, mypy
