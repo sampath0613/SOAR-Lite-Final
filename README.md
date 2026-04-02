@@ -4,8 +4,6 @@
 
 **SOAR-Lite** is a production-ready Security Orchestration, Automation, and Response (SOAR) engine built from scratch in Python. It automates security incident response through a modular, pluggable architecture that ingests alerts from multiple SIEM platforms, correlates threats using third-party threat intelligence APIs, and executes orchestrated playbooks with conditional logic.
 
-**Key Achievement**: 102 passing tests with 82% code coverage, Ruff clean code standards, and full async/await architecture for non-blocking incident processing.
-
 ---
 
 ## 🏗️ Architecture & Design
